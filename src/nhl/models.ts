@@ -85,6 +85,12 @@ export type TeamsResponse = {
 // ---------------------------------------------------------------------------
 
 export type PlayByPlayResponse = {
+  id: number;
+  season: number;
+  gameType: number;
+  gameDate: string;
+  homeTeam: { id: number; abbrev: string; score: number };
+  awayTeam: { id: number; abbrev: string; score: number };
   plays: PlayEvent[];
   rosterSpots: RosterSpot[];
 };
@@ -189,6 +195,33 @@ export type StandingsTeam = {
   gamesPlayed: number;
   goalFor: number;
   goalAgainst: number;
+};
+
+// ---------------------------------------------------------------------------
+// Game story  (highlight clips live here)
+// ---------------------------------------------------------------------------
+
+export type GoalPlay = {
+  eventId: number;
+  timeInPeriod: string;     // "MM:SS"
+  teamAbbrev: NameInfo;
+  playerId: number;
+  firstName: NameInfo;
+  lastName: NameInfo;
+  highlightClip?: number;   // Brightcove clip ID — absent if no clip exists
+};
+
+export type ScoringPeriod = {
+  periodDescriptor: PeriodDescriptor;
+  goals: GoalPlay[];
+};
+
+export type GameLandingResponse = {
+  id: number;
+  season: number;
+  summary?: {
+    scoring?: ScoringPeriod[];
+  };
 };
 
 // ---------------------------------------------------------------------------

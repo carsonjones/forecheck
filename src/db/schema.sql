@@ -105,3 +105,40 @@ CREATE TABLE IF NOT EXISTS player_ratings (
 );
 
 CREATE INDEX IF NOT EXISTS ratings_season ON player_ratings(season, total_war);
+
+-- ---------------------------------------------------------------------------
+-- Highlights  (goal clip metadata, video stored in R2)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS highlights (
+  id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+  game_id             INTEGER NOT NULL REFERENCES games(id),
+  event_id            INTEGER NOT NULL,
+  season              INTEGER NOT NULL,
+  brightcove_clip_id  INTEGER NOT NULL,
+  r2_key              TEXT,                -- null until uploaded to R2
+  period              INTEGER NOT NULL,
+  time_in_period      TEXT NOT NULL,
+  scorer_id           INTEGER,
+  team_id             INTEGER,
+  ingested_at         TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE(game_id, event_id)
+);
+
+CREATE INDEX IF NOT EXISTS highlights_game   ON highlights(game_id);
+CREATE INDEX IF NOT EXISTS highlights_season ON highlights(season);
+
+-- ---------------------------------------------------------------------------
+-- Transcripts  (Whisper transcriptions of goal clips)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS transcripts (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  game_id     INTEGER NOT NULL,
+  event_id    INTEGER NOT NULL,
+  transcript  TEXT NOT NULL,
+  model       TEXT NOT NULL DEFAULT 'whisper-large-v3-turbo',
+  ingested_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE(game_id, event_id),
+  FOREIGN KEY (game_id, event_id) REFERENCES highlights(game_id, event_id)
+);
+
+CREATE INDEX IF NOT EXISTS transcripts_game ON transcripts(game_id);

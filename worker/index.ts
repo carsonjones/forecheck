@@ -1,6 +1,9 @@
 type Env = {
   DB: D1Database;
   CACHE: KVNamespace;
+  HIGHLIGHTS: R2Bucket;
+  AI: Ai;
+  ADMIN_SECRET: string;
 };
 
 type ScheduledEvent = { cron: string; scheduledTime: number };
@@ -46,6 +49,36 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
   if (playerMatch && request.method === 'GET') {
     const playerId = Number(playerMatch[1]);
     return handlePlayerWar(playerId, url, env);
+  }
+
+  // POST /admin/backfill/game  { gameId, highlights? }
+  if (url.pathname === '/admin/backfill/game' && request.method === 'POST') {
+    return handleAdminBackfillGame(request, env);
+  }
+
+  // POST /admin/transcribe  — body: raw MP3 bytes, returns { transcript }
+  if (url.pathname === '/admin/transcribe' && request.method === 'POST') {
+    return handleAdminTranscribe(request, env);
+  }
+
+  // GET /api/highlights/game/:gameId
+  const highlightsGameMatch = url.pathname.match(/^\/api\/highlights\/game\/(\d+)$/);
+  if (highlightsGameMatch && request.method === 'GET') {
+    return handleHighlightsForGame(Number(highlightsGameMatch[1]), url, env);
+  }
+
+  // GET /api/highlights/event/:eventId?gameId=
+  const highlightsEventMatch = url.pathname.match(/^\/api\/highlights\/event\/(\d+)$/);
+  if (highlightsEventMatch && request.method === 'GET') {
+    const gameId = url.searchParams.get('gameId');
+    if (!gameId) return json({ error: 'gameId required' }, { status: 400 });
+    return handleHighlightForEvent(Number(highlightsEventMatch[1]), Number(gameId), env);
+  }
+
+  // GET /api/highlights/stream/:gameId/:eventId
+  const streamMatch = url.pathname.match(/^\/api\/highlights\/stream\/(\d+)\/(\d+)$/);
+  if (streamMatch && request.method === 'GET') {
+    return handleHighlightStream(Number(streamMatch[1]), Number(streamMatch[2]), env);
   }
 
   return new Response('Not Found', { status: 404 });
@@ -106,13 +139,118 @@ async function handlePlayerWar(playerId: number, url: URL, env: Env): Promise<Re
 }
 
 // ---------------------------------------------------------------------------
+// Admin
+// ---------------------------------------------------------------------------
+
+async function handleAdminBackfillGame(request: Request, env: Env): Promise<Response> {
+  if (request.headers.get('Authorization') !== `Bearer ${env.ADMIN_SECRET}`) {
+    return new Response('Unauthorized', { status: 401 });
+  }
+
+  const { gameId, highlights: withHighlights = true } = await request.json() as {
+    gameId: number;
+    highlights?: boolean;
+  };
+
+  const { NhlClient } = await import('../src/nhl/index.js');
+  const { ingestGame } = await import('../src/ingest/ingestGame.js');
+  const { ingestHighlights } = await import('../src/ingest/ingestHighlights.js');
+
+  const client = new NhlClient();
+  await ingestGame(gameId, client, env.DB);
+  if (withHighlights) await ingestHighlights(gameId, client, env.DB, env.HIGHLIGHTS);
+
+  return json({ ok: true, gameId }, { headers: { 'Cache-Control': 'no-store' } });
+}
+
+async function handleAdminTranscribe(request: Request, env: Env): Promise<Response> {
+  if (request.headers.get('Authorization') !== `Bearer ${env.ADMIN_SECRET}`) {
+    return new Response('Unauthorized', { status: 401 });
+  }
+
+  const mp3 = await request.arrayBuffer();
+  const result = await env.AI.run('@cf/openai/whisper-large-v3-turbo', {
+    audio: [...new Uint8Array(mp3)],
+  }) as { text?: string };
+
+  const transcript = result.text?.trim();
+  if (!transcript) return json({ error: 'empty transcript' }, { status: 500 });
+  return json({ transcript }, { headers: { 'Cache-Control': 'no-store' } });
+}
+
+// ---------------------------------------------------------------------------
+// Highlights
+// ---------------------------------------------------------------------------
+
+const HIGHLIGHT_COLS = `
+  h.event_id,
+  h.period,
+  h.time_in_period,
+  h.brightcove_clip_id,
+  h.r2_key,
+  h.season,
+  p.first_name,
+  p.last_name
+`;
+
+function highlightRow(row: Record<string, unknown>, baseUrl: string) {
+  const streamUrl = row.r2_key
+    ? `${baseUrl}/api/highlights/stream/${row.game_id ?? ''}/${row.event_id}`
+    : null;
+  return { ...row, stream_url: streamUrl };
+}
+
+async function handleHighlightsForGame(gameId: number, url: URL, env: Env): Promise<Response> {
+  const { results } = await env.DB.prepare(`
+    SELECT ${HIGHLIGHT_COLS}, h.game_id
+    FROM highlights h
+    LEFT JOIN players p ON p.id = h.scorer_id
+    WHERE h.game_id = ?
+    ORDER BY h.period, h.time_in_period
+  `).bind(gameId).all();
+
+  const baseUrl = new URL(url).origin;
+  return json(results.map((r) => highlightRow(r as any, baseUrl)));
+}
+
+async function handleHighlightForEvent(eventId: number, gameId: number, env: Env): Promise<Response> {
+  const row = await env.DB.prepare(`
+    SELECT ${HIGHLIGHT_COLS}, h.game_id
+    FROM highlights h
+    LEFT JOIN players p ON p.id = h.scorer_id
+    WHERE h.event_id = ? AND h.game_id = ?
+  `).bind(eventId, gameId).first();
+
+  if (!row) return json({ error: 'not found' }, { status: 404 });
+  return json(row);
+}
+
+async function handleHighlightStream(gameId: number, eventId: number, env: Env): Promise<Response> {
+  const row = await env.DB.prepare(
+    'SELECT r2_key FROM highlights WHERE game_id = ? AND event_id = ?'
+  ).bind(gameId, eventId).first<{ r2_key: string }>();
+
+  if (!row?.r2_key) return new Response('not found', { status: 404 });
+
+  const object = await env.HIGHLIGHTS.get(row.r2_key);
+  if (!object) return new Response('not found in R2', { status: 404 });
+
+  return new Response(object.body, {
+    headers: {
+      'Content-Type': 'video/mp4',
+      'Cache-Control': 'public, max-age=31536000',
+      'Access-Control-Allow-Origin': '*',
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Nightly cron  (6am UTC — runs after overnight games finish)
 // ---------------------------------------------------------------------------
 
-async function runNightlyIngest(_env: Env): Promise<void> {
-  // TODO: import and call nightly ingest logic
-  // Will be implemented in src/ingest/nightly.ts
-  console.log('nightly ingest triggered');
+async function runNightlyIngest(env: Env): Promise<void> {
+  const { runNightly } = await import('../src/ingest/nightly.js');
+  await runNightly(env.DB, env.HIGHLIGHTS);
 }
 
 // ---------------------------------------------------------------------------

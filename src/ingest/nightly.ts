@@ -11,8 +11,11 @@
 import { NhlClient } from '../nhl/index.js';
 import { addDays, formatDate } from '../nhl/formatters.js';
 import { ingestGame } from './ingestGame.js';
+import { ingestHighlights } from './ingestHighlights.js';
 
-export async function runNightly(db: D1Database): Promise<void> {
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+export async function runNightly(db: D1Database, r2?: R2Bucket): Promise<void> {
   const client = new NhlClient();
   const yesterday = formatDate(addDays(new Date(), -1));
 
@@ -22,21 +25,17 @@ export async function runNightly(db: D1Database): Promise<void> {
 
   let ingested = 0;
   for (const game of schedule.games) {
-    if (game.gameState !== 'OFF') continue; // skip games not yet final
+    if (game.gameState !== 'OFF') continue;
     try {
       await ingestGame(game.id, client, db);
+      await ingestHighlights(game.id, client, db, r2);
       ingested++;
     } catch (err) {
       console.error(`  failed game ${game.id}:`, err);
     }
-    await Bun.sleep(300);
+    await sleep(300);
   }
 
   console.log(`nightly done: ${ingested} games ingested`);
 }
 
-// allow direct execution
-if (import.meta.main) {
-  const db = null as unknown as D1Database;
-  await runNightly(db);
-}

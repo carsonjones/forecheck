@@ -3,21 +3,32 @@
   "name": "forecheck",
   "main": "./worker/index.ts",
   "compatibility_date": "2026-03-22",
+  "kv_namespaces": [
+    {
+      "binding": "CACHE",
+      "id": "04f33cbb56bc44b099a0b444359c70b4"
+    }
+  ],
   "d1_databases": [
     {
       "binding": "DB",
       "database_name": "forecheck",
       "database_id": "2083472b-de3b-496d-84ca-66cceceff66f",
-      "preview_database_id": "REPLACE_WITH_D1_ID"
+      "preview_database_id": "2083472b-de3b-496d-84ca-66cceceff66f"
     }
   ],
-  "kv_namespaces": [
+  "r2_buckets": [
     {
-      "binding": "CACHE",
-      "id": "REPLACE_WITH_KV_ID",
-      "preview_id": "REPLACE_WITH_KV_ID"
+      "binding": "HIGHLIGHTS",
+      "bucket_name": "forecheck"
     }
   ],
+  "observability": {
+    "enabled": true
+  },
+  "ai": {
+    "binding": "AI"
+  },
   "triggers": {
     "crons": ["0 6 * * *"]
   }

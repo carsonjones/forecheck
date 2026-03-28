@@ -3,6 +3,7 @@ import { formatDate, getCurrentSeasonId } from './formatters.js';
 import type {
   FilteredScoreboardResponse,
   Game,
+  GameLandingResponse,
   PlayByPlayResponse,
   ShiftChartsResponse,
   StandingsResponse,
@@ -37,14 +38,22 @@ export class NhlClient {
 
   private async get<T>(baseUrl: string, path: string): Promise<T> {
     const url = `${baseUrl}${path}`;
-    const response = await this.http(url, {
-      method: 'GET',
-      headers: { Accept: 'application/json' },
-    });
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status} for ${url}`);
+    for (let attempt = 0; attempt < 4; attempt++) {
+      const response = await this.http(url, {
+        method: 'GET',
+        headers: { Accept: 'application/json' },
+      });
+      if (response.status === 429) {
+        const delay = 1000 * 2 ** attempt; // 1s, 2s, 4s, 8s
+        await new Promise((r) => setTimeout(r, delay));
+        continue;
+      }
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status} for ${url}`);
+      }
+      return (await response.json()) as T;
     }
-    return (await response.json()) as T;
+    throw new Error(`HTTP 429 (rate limited after retries) for ${url}`);
   }
 
   private web<T>(path: string) {
@@ -85,6 +94,10 @@ export class NhlClient {
   // ---------------------------------------------------------------------------
   // Shift charts  (stats API)
   // ---------------------------------------------------------------------------
+
+  async getGameLanding(gameId: number): Promise<GameLandingResponse> {
+    return this.web<GameLandingResponse>(`/gamecenter/${gameId}/landing`);
+  }
 
   async getShiftCharts(gameId: number): Promise<ShiftChartsResponse> {
     return this.stats<ShiftChartsResponse>(

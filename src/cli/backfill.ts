@@ -1,25 +1,16 @@
-/**
- * backfill.ts
- *
- * Fetches historical seasons from the NHL API and writes to D1.
- * Run locally: bun run src/ingest/backfill.ts
- *
- * Usage:
- *   bun run src/ingest/backfill.ts --seasons 20222023,20232024,20242025
- *   bun run src/ingest/backfill.ts --game 2025021115   (single game, for testing)
- */
-
+import { cloudD1FromEnv } from '../db/cloudD1.js';
+import { createLocalD1 } from '../db/localD1.js';
 import { NhlClient } from '../nhl/index.js';
-import { ingestGame } from './ingestGame.js';
+import { ingestGame } from '../ingest/ingestGame.js';
 
 const args = process.argv.slice(2);
 const seasonArg = args.find((a) => a.startsWith('--seasons='))?.split('=')[1];
 const gameArg = args.find((a) => a.startsWith('--game='))?.split('=')[1];
+const dbPath = args.find((a) => a.startsWith('--db='))?.split('=')[1] ?? './forecheck-dev.db';
 
 const client = new NhlClient();
-
-// TODO: replace with real D1 binding (via wrangler d1 or local SQLite for dev)
-const db = null as unknown as D1Database;
+const db = cloudD1FromEnv() ?? createLocalD1(dbPath);
+console.log(process.env.CF_API_TOKEN ? 'using cloud D1' : `using local DB: ${dbPath}`);
 
 if (gameArg) {
   console.log(`ingesting single game ${gameArg}`);
@@ -27,9 +18,7 @@ if (gameArg) {
   process.exit(0);
 }
 
-const seasons = seasonArg
-  ? seasonArg.split(',').map(Number)
-  : [20242025];
+const seasons = seasonArg ? seasonArg.split(',').map(Number) : [20242025];
 
 for (const season of seasons) {
   console.log(`\n=== season ${season} ===`);
@@ -45,7 +34,6 @@ for (const season of seasons) {
     } catch (err) {
       console.error(`  failed game ${gameId}:`, err);
     }
-    // be polite to the API
     await Bun.sleep(300);
   }
   console.log(`  done: ${done}/${gameIds.length}`);

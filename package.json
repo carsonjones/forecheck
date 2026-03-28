@@ -4,16 +4,23 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "cf:dev": "wrangler dev",
+    "cf:dev": "wrangler dev --remote",
     "deploy": "wrangler deploy",
-    "db:init": "wrangler d1 execute forecheck --file=./src/db/schema.sql",
-    "db:init:local": "wrangler d1 execute forecheck --local --file=./src/db/schema.sql",
-    "ingest:backfill": "bun run src/ingest/backfill.ts",
-    "ingest:nightly": "bun run src/ingest/nightly.ts"
+    "db:migrate": "bun run src/cli/migrate.ts",
+    "db:migrate:local": "bun run src/cli/migrate.ts --local",
+    "db:migrate:status": "bun run src/cli/migrate.ts --status",
+    "ingest:backfill": "bun run src/cli/backfill.ts",
+    "ingest:admin-backfill": "bun run src/cli/adminBackfill.ts",
+    "ingest:highlights": "bun run src/cli/highlights.ts",
+    "ingest:nightly": "bun run src/cli/nightly.ts",
+    "transcribe": "bun run src/cli/transcribe.ts"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250115.0",
     "typescript": "^5.6.3",
     "wrangler": "^4.0.0"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.1019.0"
   }
 }

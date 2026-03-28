@@ -32,6 +32,26 @@ export async function ingestGame(
 
   const statements: D1PreparedStatement[] = [];
 
+  // --- upsert game ---
+  statements.push(
+    db.prepare(`
+      INSERT INTO games (id, season, game_type, game_date, home_team_id, away_team_id, home_score, away_score)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        home_score = excluded.home_score,
+        away_score = excluded.away_score
+    `).bind(
+      gameId,
+      pbp.season,
+      pbp.gameType,
+      pbp.gameDate,
+      pbp.homeTeam.id,
+      pbp.awayTeam.id,
+      pbp.homeTeam.score ?? null,
+      pbp.awayTeam.score ?? null,
+    ),
+  );
+
   // --- upsert players from rosterSpots ---
   for (const spot of pbp.rosterSpots) {
     statements.push(
