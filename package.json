@@ -1,0 +1,19 @@
+{
+  "name": "forecheck",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "cf:dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "db:init": "wrangler d1 execute forecheck --file=./src/db/schema.sql",
+    "db:init:local": "wrangler d1 execute forecheck --local --file=./src/db/schema.sql",
+    "ingest:backfill": "bun run src/ingest/backfill.ts",
+    "ingest:nightly": "bun run src/ingest/nightly.ts"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250115.0",
+    "typescript": "^5.6.3",
+    "wrangler": "^4.0.0"
+  }
+}
