@@ -60,12 +60,31 @@ async function extractAudio(mp4Bytes: Uint8Array): Promise<Uint8Array> {
   return new Uint8Array(mp3);
 }
 
-async function transcribeAudio(audioBytes: Uint8Array): Promise<string> {
+async function getGamePrompt(gameId: number): Promise<string> {
+  const { results } = await db!.prepare(`
+    SELECT DISTINCT p.first_name, p.last_name
+    FROM players p
+    JOIN events e ON e.scoring_player_id = p.id OR e.shooting_player_id = p.id
+      OR e.assist1_player_id = p.id OR e.assist2_player_id = p.id
+    WHERE e.game_id = ?
+    UNION
+    SELECT DISTINCT p.first_name, p.last_name
+    FROM players p
+    JOIN shifts s ON s.player_id = p.id
+    WHERE s.game_id = ?
+  `).bind(gameId, gameId).all<{ first_name: string; last_name: string }>();
+
+  const names = results.map((r) => `${r.first_name} ${r.last_name}`).join(', ');
+  return `NHL hockey game. Players: ${names}.`;
+}
+
+async function transcribeAudio(audioBytes: Uint8Array, prompt: string): Promise<string> {
   const res = await fetch(TRANSCRIBE_URL, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${ADMIN_SECRET}`,
       'Content-Type': 'audio/mpeg',
+      'X-Prompt': encodeURIComponent(prompt),
     },
     body: audioBytes,
   });
@@ -74,19 +93,21 @@ async function transcribeAudio(audioBytes: Uint8Array): Promise<string> {
   return data.transcript;
 }
 
-async function transcribeHighlight(row: { game_id: number; event_id: number; r2_key: string }): Promise<void> {
+async function transcribeHighlight(row: { game_id: number; event_id: number; r2_key: string }, prompt: string): Promise<void> {
+  process.stdout.write(`\n  fetching ${row.game_id}/${row.event_id}...`);
   const obj = await r2!.get(row.r2_key);
   if (!obj) throw new Error(`R2 key not found: ${row.r2_key}`);
 
   const mp4Bytes = new Uint8Array(await new Response(obj.body).arrayBuffer());
   const audioBytes = await extractAudio(mp4Bytes);
-  const transcript = await transcribeAudio(audioBytes);
+  const transcript = await transcribeAudio(audioBytes, prompt);
 
   await db!.prepare(`
-    INSERT INTO transcripts (game_id, event_id, transcript)
-    VALUES (?, ?, ?)
+    INSERT INTO transcripts (game_id, event_id, transcript, model)
+    VALUES (?, ?, ?, 'whisper')
     ON CONFLICT(game_id, event_id) DO UPDATE SET
       transcript  = excluded.transcript,
+      model       = excluded.model,
       ingested_at = datetime('now')
   `).bind(row.game_id, row.event_id, transcript).run();
 
@@ -114,25 +135,41 @@ const { results } = await db.prepare(`
   ORDER BY h.game_id, h.event_id
 `).bind(...binds).all<{ game_id: number; event_id: number; r2_key: string }>();
 
-console.log(`${results.length} highlights to transcribe — ${CONCURRENCY} concurrent`);
+const total = results.length;
+console.log(`${total} highlights to transcribe — ${CONCURRENCY} concurrent`);
+
+// group by game so we fetch the roster prompt once per game
+const byGame = new Map<number, typeof results>();
+for (const row of results) {
+  if (!byGame.has(row.game_id)) byGame.set(row.game_id, []);
+  byGame.get(row.game_id)!.push(row);
+}
 
 let done = 0;
 let failed = 0;
+const games = [...byGame.keys()];
 
-for (let i = 0; i < results.length; i += CONCURRENCY) {
-  const chunk = results.slice(i, i + CONCURRENCY);
-  await Promise.allSettled(
-    chunk.map(async (row) => {
-      try {
-        await transcribeHighlight(row);
-        done++;
-      } catch (err) {
-        failed++;
-        console.error(`  ✗ ${row.game_id}/${row.event_id}: ${err}`);
-      }
-    }),
-  );
-  if (i + CONCURRENCY < results.length) await new Promise((r) => setTimeout(r, DELAY_MS));
+for (let g = 0; g < games.length; g++) {
+  const gameId = games[g];
+  const rows = byGame.get(gameId)!;
+  const prompt = await getGamePrompt(gameId);
+
+  for (let i = 0; i < rows.length; i += CONCURRENCY) {
+    const chunk = rows.slice(i, i + CONCURRENCY);
+    await Promise.allSettled(
+      chunk.map(async (row) => {
+        try {
+          await transcribeHighlight(row, prompt);
+          done++;
+          process.stdout.write(`\r  ${done}/${total} clips  ${g + 1}/${games.length} games  ${failed} failed`);
+        } catch (err) {
+          failed++;
+          console.error(`\n  ✗ ${row.game_id}/${row.event_id}: ${err}`);
+        }
+      }),
+    );
+    if (i + CONCURRENCY < rows.length) await new Promise((r) => setTimeout(r, DELAY_MS));
+  }
 }
 
 console.log(`\ndone: ${done} transcribed, ${failed} failed`);

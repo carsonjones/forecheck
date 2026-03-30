@@ -169,8 +169,11 @@ async function handleAdminTranscribe(request: Request, env: Env): Promise<Respon
   }
 
   const mp3 = await request.arrayBuffer();
-  const result = await env.AI.run('@cf/openai/whisper-large-v3-turbo', {
+  const promptRaw = request.headers.get('X-Prompt');
+  const prompt = promptRaw ? decodeURIComponent(promptRaw) : undefined;
+  const result = await env.AI.run('@cf/openai/whisper', {
     audio: [...new Uint8Array(mp3)],
+    ...(prompt ? { prompt } : {}),
   }) as { text?: string };
 
   const transcript = result.text?.trim();
