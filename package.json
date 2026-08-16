@@ -4,8 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "cf:dev": "wrangler dev --remote",
-    "deploy": "wrangler deploy",
+    "cf:dev": "bun run web:build && wrangler dev --remote",
+    "deploy": "bun run web:build && wrangler deploy",
+    "web:dev": "bun run --cwd web dev",
+    "web:build": "bun run --cwd web build",
     "db:migrate": "bun run src/cli/migrate.ts",
     "db:migrate:local": "bun run src/cli/migrate.ts --local",
     "db:migrate:status": "bun run src/cli/migrate.ts --status",
