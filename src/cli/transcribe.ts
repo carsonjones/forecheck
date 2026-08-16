@@ -15,6 +15,7 @@
  *   bun run src/cli/transcribe.ts --season=20252026 --concurrency=3
  */
 
+import { parseTranscriptionResult, type TranscriptionResult } from '../transcription.js';
 import { cloudD1FromEnv } from '../db/cloudD1.js';
 import { localR2FromEnv } from '../db/localR2.js';
 
@@ -39,6 +40,7 @@ const CONCURRENCY = Number(args.find((a) => a.startsWith('--concurrency='))?.spl
 const DELAY_MS = Number(args.find((a) => a.startsWith('--delay='))?.split('=')[1] ?? '500');
 
 const TRANSCRIBE_URL = `${WORKER_URL}/admin/transcribe`;
+const LEGACY_TRANSCRIPTION_MODEL = '@cf/openai/whisper';
 
 // ---------------------------------------------------------------------------
 
@@ -78,7 +80,7 @@ async function getGamePrompt(gameId: number): Promise<string> {
   return `NHL hockey game. Players: ${names}.`;
 }
 
-async function transcribeAudio(audioBytes: Uint8Array, prompt: string): Promise<string> {
+async function transcribeAudio(audioBytes: Uint8Array, prompt: string): Promise<TranscriptionResult> {
   const res = await fetch(TRANSCRIBE_URL, {
     method: 'POST',
     headers: {
@@ -89,8 +91,11 @@ async function transcribeAudio(audioBytes: Uint8Array, prompt: string): Promise<
     body: audioBytes,
   });
   if (!res.ok) throw new Error(`transcribe ${res.status}: ${await res.text()}`);
-  const data = await res.json() as { transcript: string };
-  return data.transcript;
+
+  const data: unknown = await res.json();
+  // Production may still run the legacy endpoint during a rolling upgrade.
+  // Its response omitted model metadata, but its model identity is known.
+  return parseTranscriptionResult(data, LEGACY_TRANSCRIPTION_MODEL);
 }
 
 async function transcribeHighlight(row: { game_id: number; event_id: number; r2_key: string }, prompt: string): Promise<void> {
@@ -100,16 +105,16 @@ async function transcribeHighlight(row: { game_id: number; event_id: number; r2_
 
   const mp4Bytes = new Uint8Array(await new Response(obj.body).arrayBuffer());
   const audioBytes = await extractAudio(mp4Bytes);
-  const transcript = await transcribeAudio(audioBytes, prompt);
+  const { transcript, model } = await transcribeAudio(audioBytes, prompt);
 
   await db!.prepare(`
     INSERT INTO transcripts (game_id, event_id, transcript, model)
-    VALUES (?, ?, ?, 'whisper')
+    VALUES (?, ?, ?, ?)
     ON CONFLICT(game_id, event_id) DO UPDATE SET
       transcript  = excluded.transcript,
       model       = excluded.model,
       ingested_at = datetime('now')
-  `).bind(row.game_id, row.event_id, transcript).run();
+  `).bind(row.game_id, row.event_id, transcript, model).run();
 
   console.log(`  ✓ ${row.game_id}/${row.event_id}: ${transcript.slice(0, 80)}`);
 }

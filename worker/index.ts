@@ -6,6 +6,8 @@ type Env = {
   ADMIN_SECRET: string;
 };
 
+const TRANSCRIPTION_MODEL = '@cf/openai/whisper-large-v3-turbo' as const;
+
 type ScheduledEvent = { cron: string; scheduledTime: number };
 
 const json = (body: unknown, init?: ResponseInit) =>
@@ -56,7 +58,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
     return handleAdminBackfillGame(request, env);
   }
 
-  // POST /admin/transcribe  — body: raw MP3 bytes, returns { transcript }
+  // POST /admin/transcribe  — body: raw MP3 bytes, returns { transcript, model }
   if (url.pathname === '/admin/transcribe' && request.method === 'POST') {
     return handleAdminTranscribe(request, env);
   }
@@ -163,22 +165,57 @@ async function handleAdminBackfillGame(request: Request, env: Env): Promise<Resp
   return json({ ok: true, gameId }, { headers: { 'Cache-Control': 'no-store' } });
 }
 
+function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  const chunkSize = 0x8000;
+  let binary = '';
+
+  for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(offset, offset + chunkSize));
+  }
+
+  return btoa(binary);
+}
+
+function decodePrompt(raw: string | null): string | undefined {
+  if (!raw) return undefined;
+
+  // X-Prompt has historically been URI encoded, but accepting a raw value keeps
+  // the endpoint compatible with callers that send an ordinary header value.
+  try {
+    return decodeURIComponent(raw);
+  } catch {
+    return raw;
+  }
+}
+
 async function handleAdminTranscribe(request: Request, env: Env): Promise<Response> {
   if (request.headers.get('Authorization') !== `Bearer ${env.ADMIN_SECRET}`) {
     return new Response('Unauthorized', { status: 401 });
   }
 
   const mp3 = await request.arrayBuffer();
-  const promptRaw = request.headers.get('X-Prompt');
-  const prompt = promptRaw ? decodeURIComponent(promptRaw) : undefined;
-  const result = await env.AI.run('@cf/openai/whisper', {
-    audio: [...new Uint8Array(mp3)],
-    ...(prompt ? { prompt } : {}),
-  }) as { text?: string };
+  if (mp3.byteLength === 0) {
+    return json({ error: 'audio body required' }, { status: 400, headers: { 'Cache-Control': 'no-store' } });
+  }
+
+  const initialPrompt = decodePrompt(request.headers.get('X-Prompt'));
+  const input = {
+    audio: arrayBufferToBase64(mp3),
+    task: 'transcribe',
+    language: 'en',
+    vad_filter: true,
+    condition_on_previous_text: false,
+    ...(initialPrompt ? { initial_prompt: initialPrompt } : {}),
+  };
+  const result = await env.AI.run(TRANSCRIPTION_MODEL, input);
 
   const transcript = result.text?.trim();
-  if (!transcript) return json({ error: 'empty transcript' }, { status: 500 });
-  return json({ transcript }, { headers: { 'Cache-Control': 'no-store' } });
+  if (!transcript) return json({ error: 'empty transcript' }, { status: 500, headers: { 'Cache-Control': 'no-store' } });
+  return json(
+    { transcript, model: TRANSCRIPTION_MODEL },
+    { headers: { 'Cache-Control': 'no-store' } },
+  );
 }
 
 // ---------------------------------------------------------------------------
