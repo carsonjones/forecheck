@@ -164,3 +164,26 @@ export type HighlightPage = {
   results: HighlightFeedItem[];
   next_cursor: string | null;
 };
+
+export type HighlightFilters = {
+  season: string;
+  team: string;
+  player: string;
+};
+
+export type TranscriptSearchMode = 'keyword' | 'semantic' | 'hybrid';
+
+export type TranscriptSearchResult = Highlight & {
+  game_date: string;
+  home_team_id: number;
+  away_team_id: number;
+  model: string | null;
+  semantic_score?: number;
+  score?: number;
+};
+
+export type TranscriptSearchResponse = {
+  mode: TranscriptSearchMode;
+  model?: string;
+  results: TranscriptSearchResult[];
+};

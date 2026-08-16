@@ -2,12 +2,15 @@ import type {
   Game,
   GameDetail,
   GameFilters,
+  HighlightFilters,
   HighlightPage,
   Player,
   PlayerDetail,
   PlayerFilters,
   Team,
   TeamDetail,
+  TranscriptSearchMode,
+  TranscriptSearchResponse,
   WarPlayer,
 } from '@web/types';
 
@@ -80,4 +83,24 @@ export async function fetchTeamHighlights(teamId: string, season: string): Promi
   url.searchParams.set('limit', '12');
   const response = await ensureOk(await fetch(url));
   return await response.json() as HighlightPage;
+}
+
+export async function fetchHighlights(filters: HighlightFilters, cursor?: string): Promise<HighlightPage> {
+  const url = new URL('/api/highlights', window.location.origin);
+  if (filters.season) url.searchParams.set('season', filters.season);
+  if (filters.team) url.searchParams.set('team', filters.team);
+  if (filters.player) url.searchParams.set('player', filters.player);
+  if (cursor) url.searchParams.set('cursor', cursor);
+  url.searchParams.set('limit', '24');
+  const response = await ensureOk(await fetch(url));
+  return await response.json() as HighlightPage;
+}
+
+export async function searchTranscripts(query: string, mode: TranscriptSearchMode): Promise<TranscriptSearchResponse> {
+  const url = new URL('/api/search/transcripts', window.location.origin);
+  url.searchParams.set('q', query);
+  url.searchParams.set('mode', mode);
+  url.searchParams.set('limit', '50');
+  const response = await ensureOk(await fetch(url));
+  return await response.json() as TranscriptSearchResponse;
 }

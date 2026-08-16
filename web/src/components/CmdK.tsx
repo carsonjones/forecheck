@@ -4,6 +4,8 @@ import { useNavigate } from 'react-router';
 const commands = [
   { label: 'Games', hint: 'G', path: '/games' },
   { label: 'Players', hint: 'P', path: '/players' },
+  { label: 'Highlights', hint: 'H', path: '/highlights' },
+  { label: 'Transcript search', hint: '/', path: '/search' },
   { label: 'WAR leaderboard', hint: 'W', path: '/war' },
   { label: 'Teams', hint: 'T', path: '/teams' },
   { label: "Today's games", hint: 'D', path: `/games?date=${new Date().toISOString().slice(0, 10)}` },
