@@ -1,4 +1,4 @@
-import { BaseURLStats, BaseURLWeb, type SortOrder } from './constants.js';
+import { BaseURLStats, BaseURLWeb, NHL_TEAMS, type SortOrder } from './constants.js';
 import { formatDate, getCurrentSeasonId } from './formatters.js';
 import type {
   FilteredScoreboardResponse,
@@ -124,47 +124,11 @@ export class NhlClient {
   async getTeams(): Promise<TeamsResponse> {
     if (this.teamsCache) return this.teamsCache;
 
-    const teamData: Array<{ id: number; abbr: string; name: string; city: string }> = [
-      { id: 1, abbr: 'NJD', name: 'New Jersey Devils', city: 'New Jersey' },
-      { id: 2, abbr: 'NYI', name: 'New York Islanders', city: 'New York' },
-      { id: 3, abbr: 'NYR', name: 'New York Rangers', city: 'New York' },
-      { id: 4, abbr: 'PHI', name: 'Philadelphia Flyers', city: 'Philadelphia' },
-      { id: 5, abbr: 'PIT', name: 'Pittsburgh Penguins', city: 'Pittsburgh' },
-      { id: 6, abbr: 'BOS', name: 'Boston Bruins', city: 'Boston' },
-      { id: 7, abbr: 'BUF', name: 'Buffalo Sabres', city: 'Buffalo' },
-      { id: 8, abbr: 'MTL', name: 'Montreal Canadiens', city: 'Montreal' },
-      { id: 9, abbr: 'OTT', name: 'Ottawa Senators', city: 'Ottawa' },
-      { id: 10, abbr: 'TOR', name: 'Toronto Maple Leafs', city: 'Toronto' },
-      { id: 12, abbr: 'CAR', name: 'Carolina Hurricanes', city: 'Carolina' },
-      { id: 13, abbr: 'FLA', name: 'Florida Panthers', city: 'Florida' },
-      { id: 14, abbr: 'TBL', name: 'Tampa Bay Lightning', city: 'Tampa Bay' },
-      { id: 15, abbr: 'WSH', name: 'Washington Capitals', city: 'Washington' },
-      { id: 16, abbr: 'CHI', name: 'Chicago Blackhawks', city: 'Chicago' },
-      { id: 17, abbr: 'DET', name: 'Detroit Red Wings', city: 'Detroit' },
-      { id: 18, abbr: 'NSH', name: 'Nashville Predators', city: 'Nashville' },
-      { id: 19, abbr: 'STL', name: 'St. Louis Blues', city: 'St. Louis' },
-      { id: 20, abbr: 'CGY', name: 'Calgary Flames', city: 'Calgary' },
-      { id: 21, abbr: 'COL', name: 'Colorado Avalanche', city: 'Colorado' },
-      { id: 22, abbr: 'EDM', name: 'Edmonton Oilers', city: 'Edmonton' },
-      { id: 23, abbr: 'VAN', name: 'Vancouver Canucks', city: 'Vancouver' },
-      { id: 24, abbr: 'ANA', name: 'Anaheim Ducks', city: 'Anaheim' },
-      { id: 25, abbr: 'DAL', name: 'Dallas Stars', city: 'Dallas' },
-      { id: 26, abbr: 'LAK', name: 'Los Angeles Kings', city: 'Los Angeles' },
-      { id: 28, abbr: 'SJS', name: 'San Jose Sharks', city: 'San Jose' },
-      { id: 29, abbr: 'CBJ', name: 'Columbus Blue Jackets', city: 'Columbus' },
-      { id: 30, abbr: 'MIN', name: 'Minnesota Wild', city: 'Minnesota' },
-      { id: 52, abbr: 'WPG', name: 'Winnipeg Jets', city: 'Winnipeg' },
-      { id: 53, abbr: 'ARI', name: 'Arizona Coyotes', city: 'Arizona' },
-      { id: 54, abbr: 'VGK', name: 'Vegas Golden Knights', city: 'Vegas' },
-      { id: 55, abbr: 'SEA', name: 'Seattle Kraken', city: 'Seattle' },
-      { id: 59, abbr: 'UTA', name: 'Utah Hockey Club', city: 'Utah' },
-    ];
-
     this.teamsCache = {
-      teams: teamData.map((t) => ({
+      teams: NHL_TEAMS.map((t) => ({
         id: t.id,
-        abbreviation: t.abbr,
-        triCode: t.abbr,
+        abbreviation: t.abbreviation,
+        triCode: t.abbreviation,
         name: { default: t.name },
         city: { default: t.city },
         franchiseId: 0,
