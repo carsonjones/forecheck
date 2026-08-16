@@ -32,6 +32,8 @@ type ApiEnvelope<T> = {
 
 const accountId = process.env.CF_ACCOUNT_ID;
 const apiToken = process.env.CF_API_TOKEN;
+// VECTORIZE_API_TOKEN: optional override when CF_API_TOKEN lacks Vectorize perms
+const vectorizeToken = process.env.VECTORIZE_API_TOKEN ?? apiToken;
 const db = cloudD1FromEnv();
 if (!accountId || !apiToken || !db) {
   console.error('D1/API env vars required (CF_ACCOUNT_ID, CF_API_TOKEN, D1_DATABASE_ID)');
@@ -82,12 +84,14 @@ async function embed(texts: string[]): Promise<number[][]> {
 
 async function upsert(rows: BackfillRow[], embeddings: number[][]): Promise<void> {
   const ndjson = rows.map((row, index) => JSON.stringify(transcriptVector(row, embeddings[index]!))).join('\n');
-  const form = new FormData();
-  form.append('body', new Blob([`${ndjson}\n`], { type: 'application/x-ndjson' }), 'vectors.ndjson');
 
   const response = await fetch(
     `https://api.cloudflare.com/client/v4/accounts/${accountId}/vectorize/v2/indexes/forecheck-transcripts/upsert`,
-    { method: 'POST', headers: { Authorization: `Bearer ${apiToken}` }, body: form },
+    {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${vectorizeToken}`, 'Content-Type': 'application/x-ndjson' },
+      body: `${ndjson}\n`,
+    },
   );
   if (!response.ok) throw new Error(`Vectorize ${response.status}: ${await response.text()}`);
   const body = await response.json() as ApiEnvelope<{ mutationId?: string }>;
