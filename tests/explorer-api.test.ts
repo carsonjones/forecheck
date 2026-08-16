@@ -2,6 +2,7 @@ import { Database } from 'bun:sqlite';
 import { describe, expect, it } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import worker from '../worker/index.js';
+import { reciprocalRankFusion } from '../src/search.js';
 
 function streamEnv(options?: {
   size?: number;
@@ -107,6 +108,59 @@ describe('transcript FTS migration', () => {
       SELECT COUNT(*) AS count FROM transcripts_fts
       WHERE transcripts_fts MATCH 'save'
     `).get()).toEqual({ count: 0 });
+  });
+});
+
+describe('reciprocal rank fusion', () => {
+  it('sums reciprocal ranks across lists and ranks shared results first', () => {
+    const results = reciprocalRankFusion([
+      ['keyword-first', 'shared', 'keyword-only'],
+      ['semantic-first', 'shared', 'semantic-only'],
+    ]);
+
+    expect(results[0]?.id).toBe('shared');
+    expect(results.find((result) => result.id === 'shared')?.score)
+      .toBeCloseTo(2 / 62);
+    expect(results.find((result) => result.id === 'keyword-first')?.score)
+      .toBeCloseTo(1 / 61);
+  });
+
+  it('counts a duplicate id only once per ranking', () => {
+    const [result] = reciprocalRankFusion([['same', 'same'], ['same']], 0);
+    expect(result).toEqual({ id: 'same', score: 2 });
+  });
+});
+
+describe('semantic transcript search', () => {
+  it('embeds the query, filters Vectorize metadata, and joins matches from D1', async () => {
+    let queryOptions: VectorizeQueryOptions | undefined;
+    const env = {
+      AI: {
+        run: async () => ({ shape: [1, 3], data: [[0.1, 0.2, 0.3]] }),
+      },
+      VECTORIZE: {
+        query: async (_embedding: number[], options?: VectorizeQueryOptions) => {
+          queryOptions = options;
+          return { count: 1, matches: [{ id: '1:2', score: 0.9 }] };
+        },
+      },
+      DB: {
+        prepare: () => ({
+          bind: () => ({
+            all: async () => ({ results: [{ game_id: 1, event_id: 2, transcript: 'screened goalie' }] }),
+          }),
+        }),
+      },
+    } as unknown as Parameters<typeof worker.fetch>[1];
+
+    const response = await worker.fetch(new Request(
+      'https://example.com/api/search/transcripts?q=traffic+in+front&mode=semantic&season=20242025&team=TOR',
+    ), env);
+
+    expect(response.status).toBe(200);
+    expect(queryOptions?.filter).toEqual({ season: 20242025, team_id: 10 });
+    const body = await response.json() as { results: Array<{ semantic_score: number }> };
+    expect(body.results[0]?.semantic_score).toBe(0.9);
   });
 });
 

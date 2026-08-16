@@ -12,10 +12,16 @@ import { NhlClient } from '../nhl/index.js';
 import { addDays, formatDate } from '../nhl/formatters.js';
 import { ingestGame } from './ingestGame.js';
 import { ingestHighlights } from './ingestHighlights.js';
+import { upsertTranscriptEmbeddings, type TranscriptEmbeddingRow } from '../embeddings.js';
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-export async function runNightly(db: D1Database, r2?: R2Bucket): Promise<void> {
+export async function runNightly(
+  db: D1Database,
+  r2?: R2Bucket,
+  ai?: Ai,
+  vectorize?: Vectorize,
+): Promise<void> {
   const client = new NhlClient();
   const yesterday = formatDate(addDays(new Date(), -1));
 
@@ -36,6 +42,25 @@ export async function runNightly(db: D1Database, r2?: R2Bucket): Promise<void> {
     await sleep(300);
   }
 
-  console.log(`nightly done: ${ingested} games ingested`);
+  let embedded = 0;
+  if (ai && vectorize) {
+    // Upserts are idempotent. The lookback retries transcripts created near a cron boundary.
+    const { results } = await db.prepare(`
+      SELECT
+        t.game_id,
+        t.event_id,
+        t.transcript,
+        h.season,
+        h.scorer_id,
+        h.team_id
+      FROM transcripts t
+      JOIN highlights h ON h.game_id = t.game_id AND h.event_id = t.event_id
+      WHERE t.ingested_at >= datetime('now', '-2 days')
+      ORDER BY t.id
+    `).all<TranscriptEmbeddingRow>();
+    embedded = await upsertTranscriptEmbeddings(ai, vectorize, results);
+  }
+
+  console.log(`nightly done: ${ingested} games ingested, ${embedded} transcripts embedded`);
 }
 

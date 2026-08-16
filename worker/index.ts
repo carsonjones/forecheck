@@ -1,10 +1,13 @@
 import { NHL_TEAMS } from '../src/nhl/constants.js';
+import { EMBEDDING_MODEL, embedTexts } from '../src/embeddings.js';
+import { reciprocalRankFusion } from '../src/search.js';
 
 type Env = {
   DB: D1Database;
   CACHE: KVNamespace;
   HIGHLIGHTS: R2Bucket;
   AI: Ai;
+  VECTORIZE: Vectorize;
   ADMIN_SECRET: string;
 };
 
@@ -79,7 +82,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
     return handleHighlights(url, env);
   }
 
-  // GET /api/search/transcripts?q=&mode=keyword
+  // GET /api/search/transcripts?q=&mode=keyword|semantic|hybrid
   if (url.pathname === '/api/search/transcripts' && request.method === 'GET') {
     return handleTranscriptSearch(url, env);
   }
@@ -529,49 +532,145 @@ function ftsQuery(raw: string): string | null {
   return terms.map((term) => `"${term.replaceAll('"', '""')}"`).join(' ');
 }
 
-async function handleTranscriptSearch(url: URL, env: Env): Promise<Response> {
-  const query = url.searchParams.get('q')?.trim();
-  if (!query) return json({ error: 'q required' }, { status: 400 });
-  const mode = url.searchParams.get('mode') ?? 'keyword';
-  if (mode !== 'keyword') {
-    return json({ error: 'only keyword mode is available' }, { status: 400 });
+const TRANSCRIPT_SEARCH_COLS = `
+  t.game_id,
+  t.event_id,
+  t.transcript,
+  t.model,
+  h.period,
+  h.time_in_period,
+  h.season,
+  h.scorer_id,
+  h.team_id,
+  h.r2_key,
+  p.first_name,
+  p.last_name,
+  g.game_date,
+  g.home_team_id,
+  g.away_team_id
+`;
+
+function searchRowId(row: Record<string, unknown>): string {
+  return `${row.game_id}:${row.event_id}`;
+}
+
+async function keywordTranscriptSearch(
+  env: Env,
+  match: string,
+  limit: number,
+  season?: number,
+  teamId?: number,
+): Promise<Record<string, unknown>[]> {
+  const clauses = ['transcripts_fts MATCH ?'];
+  const values: Array<string | number> = [match];
+  if (season !== undefined) {
+    clauses.push('h.season = ?');
+    values.push(season);
   }
-  const match = ftsQuery(query);
-  if (!match) return json({ error: 'q must contain searchable text' }, { status: 400 });
-  const limit = parseLimit(url, 50, 200);
+  if (teamId !== undefined) {
+    clauses.push('h.team_id = ?');
+    values.push(teamId);
+  }
+  values.push(limit);
 
   const { results } = await env.DB.prepare(`
-    SELECT
-      t.game_id,
-      t.event_id,
-      t.transcript,
-      t.model,
-      bm25(transcripts_fts) AS rank,
-      h.period,
-      h.time_in_period,
-      h.season,
-      h.scorer_id,
-      h.team_id,
-      h.r2_key,
-      p.first_name,
-      p.last_name,
-      g.game_date,
-      g.home_team_id,
-      g.away_team_id
+    SELECT ${TRANSCRIPT_SEARCH_COLS}, bm25(transcripts_fts) AS rank
     FROM transcripts_fts
     JOIN transcripts t ON t.id = transcripts_fts.rowid
     JOIN highlights h ON h.game_id = t.game_id AND h.event_id = t.event_id
     JOIN games g ON g.id = t.game_id
     LEFT JOIN players p ON p.id = h.scorer_id
-    WHERE transcripts_fts MATCH ?
+    WHERE ${clauses.join(' AND ')}
     ORDER BY rank
     LIMIT ?
-  `).bind(match, limit).all<Record<string, unknown>>();
+  `).bind(...values).all<Record<string, unknown>>();
+  return results;
+}
 
-  return json({
-    mode,
-    results: results.map((row) => highlightRow(row, url.origin)),
+async function transcriptRowsByIds(env: Env, ids: string[]): Promise<Record<string, unknown>[]> {
+  if (ids.length === 0) return [];
+  const placeholders = ids.map(() => '?').join(', ');
+  const { results } = await env.DB.prepare(`
+    SELECT ${TRANSCRIPT_SEARCH_COLS}
+    FROM transcripts t
+    JOIN highlights h ON h.game_id = t.game_id AND h.event_id = t.event_id
+    JOIN games g ON g.id = t.game_id
+    LEFT JOIN players p ON p.id = h.scorer_id
+    WHERE printf('%d:%d', t.game_id, t.event_id) IN (${placeholders})
+  `).bind(...ids).all<Record<string, unknown>>();
+  return results;
+}
+
+async function semanticTranscriptSearch(
+  env: Env,
+  query: string,
+  limit: number,
+  season?: number,
+  teamId?: number,
+): Promise<Array<Record<string, unknown> & { semantic_score: number }>> {
+  const [embedding] = await embedTexts(env.AI, [query]);
+  const filter: VectorizeVectorMetadataFilter = {};
+  if (season !== undefined) filter.season = season;
+  if (teamId !== undefined) filter.team_id = teamId;
+
+  const matches = await env.VECTORIZE.query(embedding!, {
+    topK: limit,
+    returnMetadata: 'indexed',
+    ...(Object.keys(filter).length === 0 ? {} : { filter }),
   });
+  const rows = await transcriptRowsByIds(env, matches.matches.map((match) => match.id));
+  const rowsById = new Map(rows.map((row) => [searchRowId(row), row]));
+  return matches.matches.flatMap((match) => {
+    const row = rowsById.get(match.id);
+    return row ? [{ ...row, semantic_score: match.score }] : [];
+  });
+}
+
+async function handleTranscriptSearch(url: URL, env: Env): Promise<Response> {
+  const query = url.searchParams.get('q')?.trim();
+  if (!query) return json({ error: 'q required' }, { status: 400 });
+  const mode = url.searchParams.get('mode') ?? 'keyword';
+  if (!['keyword', 'semantic', 'hybrid'].includes(mode)) {
+    return json({ error: 'mode must be keyword, semantic, or hybrid' }, { status: 400 });
+  }
+
+  const match = ftsQuery(query);
+  if (!match) return json({ error: 'q must contain searchable text' }, { status: 400 });
+  const seasonParam = url.searchParams.get('season');
+  const season = seasonParam === null ? undefined : Number(seasonParam);
+  if (season !== undefined && (!Number.isInteger(season) || season <= 0)) {
+    return json({ error: 'season must be a positive integer' }, { status: 400 });
+  }
+  const teamId = teamIdFromParam(url.searchParams.get('team'));
+  if (teamId === null) return json({ error: 'unknown team' }, { status: 400 });
+
+  const limit = parseLimit(url, 50, mode === 'keyword' ? 200 : 100);
+  if (mode === 'keyword') {
+    const results = await keywordTranscriptSearch(env, match, limit, season, teamId);
+    return json({ mode, results: results.map((row) => highlightRow(row, url.origin)) });
+  }
+  if (mode === 'semantic') {
+    const results = await semanticTranscriptSearch(env, query, limit, season, teamId);
+    return json({ mode, model: EMBEDDING_MODEL, results: results.map((row) => highlightRow(row, url.origin)) });
+  }
+
+  const candidateLimit = Math.min(Math.max(limit * 2, 50), 100);
+  const [keywordRows, semanticRows] = await Promise.all([
+    keywordTranscriptSearch(env, match, candidateLimit, season, teamId),
+    semanticTranscriptSearch(env, query, candidateLimit, season, teamId),
+  ]);
+  const fused = reciprocalRankFusion([
+    keywordRows.map(searchRowId),
+    semanticRows.map(searchRowId),
+  ]).slice(0, limit);
+  const rowsById = new Map(
+    [...keywordRows, ...semanticRows].map((row) => [searchRowId(row), row]),
+  );
+  const results = fused.flatMap(({ id, score }) => {
+    const row = rowsById.get(id);
+    return row ? [highlightRow({ ...row, score }, url.origin)] : [];
+  });
+  return json({ mode, model: EMBEDDING_MODEL, results });
 }
 
 // ---------------------------------------------------------------------------
@@ -792,7 +891,7 @@ async function handleHighlightStream(
 
 async function runNightlyIngest(env: Env): Promise<void> {
   const { runNightly } = await import('../src/ingest/nightly.js');
-  await runNightly(env.DB, env.HIGHLIGHTS);
+  await runNightly(env.DB, env.HIGHLIGHTS, env.AI, env.VECTORIZE);
 }
 
 // ---------------------------------------------------------------------------

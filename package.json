@@ -16,7 +16,8 @@
     "ingest:highlights": "bun run src/cli/highlights.ts",
     "ingest:nightly": "bun run src/cli/nightly.ts",
     "transcribe": "bun run src/cli/transcribe.ts",
-    "transcribe:sample": "bun run src/cli/retranscribe.ts"
+    "transcribe:sample": "bun run src/cli/retranscribe.ts",
+    "embed:transcripts": "bun run src/cli/embedTranscripts.ts"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250115.0",

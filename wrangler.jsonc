@@ -29,6 +29,12 @@
   "ai": {
     "binding": "AI"
   },
+  "vectorize": [
+    {
+      "binding": "VECTORIZE",
+      "index_name": "forecheck-transcripts"
+    }
+  ],
   "triggers": {
     "crons": [
       "0 6 * * *"

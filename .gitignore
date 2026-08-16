@@ -4,3 +4,4 @@ dist/
 *.local
 .env
 reports/
+.forecheck-vectorize-backfill.json
