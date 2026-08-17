@@ -113,6 +113,7 @@ async function transcribeAudio(audioBytes: Uint8Array, prompt: string): Promise<
       'X-Prompt': encodeURIComponent(prompt),
     },
     body: audioBytes,
+    signal: AbortSignal.timeout(180_000),
   });
   if (!response.ok) throw new Error(`transcribe ${response.status}: ${await response.text()}`);
 
@@ -121,6 +122,16 @@ async function transcribeAudio(audioBytes: Uint8Array, prompt: string): Promise<
     throw new Error(`expected ${TARGET_MODEL}, received ${result.model}; existing transcript preserved`);
   }
   return result;
+}
+
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) => {
+      const timer = setTimeout(() => reject(new Error(`timed out after ${ms}ms: ${label}`)), ms);
+      timer.unref?.();
+    }),
+  ]);
 }
 
 async function retranscribe(row: LegacyRow, prompt: string): Promise<void> {
@@ -178,7 +189,8 @@ for (let i = 0; i < results.length; i += concurrency) {
         prompt = await getGamePrompt(row.game_id);
         prompts.set(row.game_id, prompt);
       }
-      await retranscribe(row, prompt);
+      // one wedged item must not stall the whole Promise.all chunk forever
+      await withTimeout(retranscribe(row, prompt), 300_000, `${row.game_id}/${row.event_id}`);
       done++;
     } catch (error) {
       failed++;
