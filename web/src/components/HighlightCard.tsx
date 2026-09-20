@@ -34,7 +34,7 @@ export function HighlightCard({ highlight, title, showGame = true, active = fals
         <span>{teamAbbreviation(highlight.team_id)} · P{highlight.period} {highlight.time_in_period}</span>
       </div>
       {highlight.stream_url ? (
-        <video ref={videoRef} controls playsInline preload="none" src={highlight.stream_url} onEnded={onEnded}>Your browser does not support HTML video.</video>
+        <video ref={videoRef} controls playsInline preload="none" poster={highlight.thumb_url ?? undefined} src={highlight.stream_url} onEnded={onEnded}>Your browser does not support HTML video.</video>
       ) : <p className="clip-unavailable">Video is not available.</p>}
       {highlight.transcript && (
         <div className="transcript"><span>Transcript</span><p>{highlight.transcript}</p></div>

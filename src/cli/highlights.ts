@@ -3,6 +3,7 @@ import { createLocalD1 } from '../db/localD1.js';
 import { localR2FromEnv } from '../db/localR2.js';
 import { NhlClient } from '../nhl/index.js';
 import { ingestHighlights } from '../ingest/ingestHighlights.js';
+import { extractFirstFrame } from '../thumbnails.js';
 
 const args = process.argv.slice(2);
 const gameArg = args.find((a) => a.startsWith('--game='))?.split('=')[1];
@@ -18,5 +19,5 @@ console.log(r2 ? 'R2 uploads enabled' : 'R2 env vars not set — dry run');
 
 const client = new NhlClient();
 console.log(`ingesting highlights for game ${gameArg}`);
-await ingestHighlights(Number(gameArg), client, db, r2);
+await ingestHighlights(Number(gameArg), client, db, r2, { extractThumbnail: extractFirstFrame });
 console.log('done');

@@ -123,6 +123,12 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
     return handleHighlightForEvent(Number(highlightsEventMatch[1]), Number(gameId), env);
   }
 
+  // GET /api/highlights/thumb/:gameId/:eventId
+  const thumbMatch = url.pathname.match(/^\/api\/highlights\/thumb\/(\d+)\/(\d+)$/);
+  if (thumbMatch && request.method === 'GET') {
+    return handleHighlightThumb(Number(thumbMatch[1]), Number(thumbMatch[2]), env);
+  }
+
   // GET /api/highlights/stream/:gameId/:eventId
   const streamMatch = url.pathname.match(/^\/api\/highlights\/stream\/(\d+)\/(\d+)$/);
   if (streamMatch && request.method === 'GET') {
@@ -761,6 +767,7 @@ const HIGHLIGHT_COLS = `
   h.time_in_period,
   h.brightcove_clip_id,
   h.r2_key,
+  h.thumb_key,
   h.season,
   h.scorer_id,
   h.team_id,
@@ -772,7 +779,28 @@ function highlightRow(row: Record<string, unknown>, baseUrl: string): Record<str
   const streamUrl = row.r2_key
     ? `${baseUrl}/api/highlights/stream/${row.game_id ?? ''}/${row.event_id}`
     : null;
-  return { ...row, stream_url: streamUrl };
+  const thumbUrl = row.thumb_key
+    ? `${baseUrl}/api/highlights/thumb/${row.game_id ?? ''}/${row.event_id}`
+    : null;
+  return { ...row, stream_url: streamUrl, thumb_url: thumbUrl };
+}
+
+async function handleHighlightThumb(gameId: number, eventId: number, env: Env): Promise<Response> {
+  const row = await env.DB.prepare(
+    'SELECT thumb_key FROM highlights WHERE game_id = ? AND event_id = ?'
+  ).bind(gameId, eventId).first<{ thumb_key: string | null }>();
+  if (!row?.thumb_key) return new Response('not found', { status: 404 });
+
+  const object = await env.HIGHLIGHTS.get(row.thumb_key);
+  if (!object) return new Response('not found in R2', { status: 404 });
+  return new Response(object.body, {
+    headers: {
+      'Content-Type': 'image/jpeg',
+      'Content-Length': String(object.size),
+      'Cache-Control': 'public, max-age=31536000',
+      'Access-Control-Allow-Origin': '*',
+    },
+  });
 }
 
 async function handleHighlightsForGame(gameId: number, url: URL, env: Env): Promise<Response> {

@@ -68,9 +68,11 @@ export function createLocalR2(opts: {
       return { key } as R2Object;
     },
 
-    async get(key: string) {
+    async get(key: string, options?: R2GetOptions) {
       try {
-        const res = await s3.send(new GetObjectCommand({ Bucket: opts.bucketName, Key: key }));
+        const r = options?.range && 'offset' in options.range ? options.range : undefined;
+        const range = r ? `bytes=${r.offset ?? 0}-${r.length ? (r.offset ?? 0) + r.length - 1 : ''}` : undefined;
+        const res = await s3.send(new GetObjectCommand({ Bucket: opts.bucketName, Key: key, Range: range }));
         return {
           key,
           body: res.Body as ReadableStream,

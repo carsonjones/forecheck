@@ -44,7 +44,7 @@ export function EventTimeline({ events, highlights }: Props) {
                       <span>{teamAbbreviation(highlight.team_id)}</span>
                     </div>
                     {highlight.stream_url ? (
-                      <video controls playsInline preload="metadata" src={highlight.stream_url}>
+                      <video controls playsInline preload="none" poster={highlight.thumb_url ?? undefined} src={highlight.stream_url}>
                         Your browser does not support HTML video.
                       </video>
                     ) : <p className="clip-unavailable">Video is not available.</p>}

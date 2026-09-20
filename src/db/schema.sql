@@ -116,6 +116,7 @@ CREATE TABLE IF NOT EXISTS highlights (
   season              INTEGER NOT NULL,
   brightcove_clip_id  INTEGER NOT NULL,
   r2_key              TEXT,                -- null until uploaded to R2
+  thumb_key           TEXT,                -- first-frame jpg in R2, null until extracted
   period              INTEGER NOT NULL,
   time_in_period      TEXT NOT NULL,
   scorer_id           INTEGER,

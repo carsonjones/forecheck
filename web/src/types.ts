@@ -41,6 +41,7 @@ export type Highlight = {
   time_in_period: string;
   brightcove_clip_id: number;
   r2_key: string | null;
+  thumb_key: string | null;
   season: number;
   scorer_id: number | null;
   team_id: number | null;
@@ -49,6 +50,7 @@ export type Highlight = {
   transcript: string | null;
   transcript_model: string | null;
   stream_url: string | null;
+  thumb_url: string | null;
 };
 
 export type GameDetail = Game & {
