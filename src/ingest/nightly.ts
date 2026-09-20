@@ -31,7 +31,7 @@ export async function runNightly(
 
   let ingested = 0;
   for (const game of schedule.games) {
-    if (game.gameState !== 'OFF') continue;
+    if (game.gameState !== 'OFF' && game.gameState !== 'FINAL') continue;
     try {
       await ingestGame(game.id, client, db);
       await ingestHighlights(game.id, client, db, r2);
@@ -63,4 +63,3 @@ export async function runNightly(
 
   console.log(`nightly done: ${ingested} games ingested, ${embedded} transcripts embedded`);
 }
-
