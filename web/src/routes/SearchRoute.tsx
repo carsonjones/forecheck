@@ -75,8 +75,8 @@ export function SearchRoute() {
 
   return (
     <Layout
-      header={<><strong>FORECHECK</strong><span>Transcript search</span></>}
-      footer={<><button className="brand-button" onClick={() => window.dispatchEvent(new Event('open-cmdk'))}>● forecheck</button><span><kbd>j/k</kbd> select result · <kbd>⌘K</kbd> menu</span></>}
+      title="Search"
+      footer={<><kbd>j/k</kbd> select result · <kbd>⌘k</kbd> menu</>}
     >
       <section className="pane search-pane">
         <form className="search-controls" onSubmit={(event) => { event.preventDefault(); navigateSearch(draft.trim(), mode); }}>
@@ -99,7 +99,7 @@ export function SearchRoute() {
           </aside>
           <section className="search-detail">
             {!selected && <p className="empty-state">Select a result to view its clip.</p>}
-            {selected && <div className="search-clip"><div className="section-heading"><h2>Matched clip</h2><span>{teamAbbreviation(selected.team_id)} · P{selected.period} {selected.time_in_period}</span></div><HighlightCard key={resultId(selected)} highlight={selected} active videoRef={selectedVideo} /></div>}
+            {selected && <div className="search-clip"><div className="section-heading"><h2>Matched clip</h2><span>{teamAbbreviation(selected.team_id)} · P{selected.period} {selected.time_in_period}</span></div><HighlightCard key={resultId(selected)} highlight={selected} active videoRef={selectedVideo} transcriptDefaultOpen /></div>}
           </section>
         </div>
       </section>

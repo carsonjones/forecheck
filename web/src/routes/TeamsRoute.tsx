@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router';
 import { fetchTeam, fetchTeamHighlights, fetchTeams } from '@web/api';
 import { Layout } from '@web/components/Layout';
@@ -17,16 +17,19 @@ export function TeamsRoute() {
   const teamQuery = useQuery({ queryKey: ['team', teamId, season], queryFn: () => fetchTeam(teamId!, season), enabled: Boolean(teamId) });
   const highlightsQuery = useQuery({ queryKey: ['team-highlights', teamId, season], queryFn: () => fetchTeamHighlights(teamId!, season), enabled: Boolean(teamId) });
   const suffix = season ? `?season=${season}` : '';
+  const teams = useMemo(
+    () => [...(teamsQuery.data ?? [])].sort((a, b) => a.name.localeCompare(b.name)),
+    [teamsQuery.data],
+  );
 
   useEffect(() => {
-    if (!teamsQuery.data?.length || teamId) return;
-    navigate(`/teams/${teamsQuery.data[0]!.id}${suffix}`, { replace: true });
-  }, [navigate, suffix, teamId, teamsQuery.data]);
+    if (!teams.length || teamId) return;
+    navigate(`/teams/${teams[0]!.id}${suffix}`, { replace: true });
+  }, [navigate, suffix, teamId, teams]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.metaKey || event.ctrlKey || event.altKey || ['INPUT', 'SELECT', 'VIDEO'].includes((event.target as HTMLElement).tagName) || !['j', 'k'].includes(event.key)) return;
-      const teams = teamsQuery.data ?? [];
       if (!teams.length) return;
       event.preventDefault();
       const current = teams.findIndex((team) => String(team.id) === teamId);
@@ -35,7 +38,7 @@ export function TeamsRoute() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [navigate, suffix, teamId, teamsQuery.data]);
+  }, [navigate, suffix, teamId, teams]);
 
-  return <Layout header={<><strong>FORECHECK</strong><span>Team explorer</span></>} footer={<><button className="brand-button" onClick={() => window.dispatchEvent(new Event('open-cmdk'))}>● forecheck</button><span><kbd>⌘K</kbd> menu · <kbd>j/k</kbd> select team</span></>}><section className="split-view"><TeamsListPane teams={teamsQuery.data ?? []} status={teamsQuery.status} error={errorMessage(teamsQuery.error)} selectedTeamId={teamId ?? null} onSelect={(id) => navigate(`/teams/${id}${suffix}`)} /><TeamDetailPane team={teamQuery.data} highlights={highlightsQuery.data?.results ?? []} selectedTeamId={teamId ?? null} season={season} status={teamQuery.status} error={errorMessage(teamQuery.error)} highlightsPending={highlightsQuery.isPending} onSeasonChange={(next) => navigate(`/teams/${teamId}${next ? `?season=${next}` : ''}`)} /></section></Layout>;
+  return <Layout title="Teams" footer={<><kbd>⌘k</kbd> menu · <kbd>j/k</kbd> select team</>}><section className="split-view"><TeamsListPane teams={teams} status={teamsQuery.status} error={errorMessage(teamsQuery.error)} selectedTeamId={teamId ?? null} onSelect={(id) => navigate(`/teams/${id}${suffix}`)} /><TeamDetailPane team={teamQuery.data} highlights={highlightsQuery.data?.results ?? []} selectedTeamId={teamId ?? null} season={season} status={teamQuery.status} error={errorMessage(teamQuery.error)} highlightsPending={highlightsQuery.isPending} onSeasonChange={(next) => navigate(`/teams/${teamId}${next ? `?season=${next}` : ''}`)} /></section></Layout>;
 }

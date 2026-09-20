@@ -1,13 +1,30 @@
 import type { ReactNode } from 'react';
 
-type LayoutProps = { header: ReactNode; footer: ReactNode; children: ReactNode };
+type AppHeaderProps = { title: string };
+type AppFooterProps = { children: ReactNode };
+type LayoutProps = { title: string; footer: ReactNode; children: ReactNode };
 
-export function Layout({ header, footer, children }: LayoutProps) {
+const openMenu = () => window.dispatchEvent(new Event('open-cmdk'));
+
+export function AppHeader({ title }: AppHeaderProps) {
+  return <header className="app-header"><button className="header-button" onClick={openMenu}>{title}</button></header>;
+}
+
+export function AppFooter({ children }: AppFooterProps) {
+  return (
+    <footer className="app-footer">
+      <button className="brand-button" onClick={openMenu}>● forecheck</button>
+      <span>{children}</span>
+    </footer>
+  );
+}
+
+export function Layout({ title, footer, children }: LayoutProps) {
   return (
     <div className="app-shell">
-      <header className="app-header">{header}</header>
+      <AppHeader title={title} />
       <main className="app-main">{children}</main>
-      <footer className="app-footer">{footer}</footer>
+      <AppFooter>{footer}</AppFooter>
     </div>
   );
 }

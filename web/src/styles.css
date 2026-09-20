@@ -2,15 +2,16 @@
   color-scheme: dark;
   font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   font-synthesis: none;
-  --deep: #0b100e;
-  --surface: #111714;
-  --raised: #17201b;
-  --line: #34443a;
-  --line-bright: #75907e;
-  --text: #dbe8df;
-  --dim: #8fa096;
-  --accent: #a8f0be;
-  --danger: #ff9f9f;
+  --deep: #000;
+  --surface: rgb(255 255 255 / 0.04);
+  --raised: rgb(255 255 255 / 0.08);
+  --line: rgb(255 255 255 / 0.12);
+  --line-bright: rgb(255 255 255 / 0.24);
+  --text: rgb(255 255 255 / 0.92);
+  --dim: rgb(255 255 255 / 0.56);
+  --accent: #fff;
+  --danger: rgb(255 255 255 / 0.78);
+  --ink-dim: rgb(0 0 0 / 0.58);
 }
 
 * { box-sizing: border-box; }
@@ -22,8 +23,7 @@ kbd { padding: 0.08rem 0.3rem; border: 1px solid var(--line); border-radius: 3px
 
 .app-shell { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; height: 100dvh; padding: 0 0.8rem; }
 .app-header, .app-footer { display: flex; align-items: center; justify-content: space-between; gap: 1rem; min-height: 3.25rem; padding: 0.7rem 0.25rem; color: var(--dim); }
-.app-header strong { color: var(--accent); letter-spacing: 0.16em; }
-.app-header span { font-size: 0.85rem; }
+.header-button { border: 0; padding: 0; background: transparent; color: var(--accent); cursor: pointer; font: inherit; font-weight: 700; letter-spacing: 0.16em; }
 .app-main { min-height: 0; }
 .app-footer { min-height: 2.75rem; font-size: 0.78rem; white-space: nowrap; }
 .brand-button { border: 0; padding: 0; background: transparent; color: var(--accent); cursor: pointer; }
@@ -42,7 +42,7 @@ kbd { padding: 0.08rem 0.3rem; border: 1px solid var(--line); border-radius: 3px
 .game-row.active { background: var(--text); color: var(--deep); }
 .game-row-main { display: flex; flex-direction: column; gap: 0.18rem; }
 .game-row small { color: var(--dim); }
-.game-row.active small { color: #425047; }
+.game-row.active small { color: var(--ink-dim); }
 .score { font-size: 1.05rem; font-weight: 700; }
 .empty-state { margin: 0; padding: 1rem; color: var(--dim); }
 .error { color: var(--danger); }
@@ -70,18 +70,19 @@ h1 span { color: var(--dim); font-weight: 400; }
 .clip { margin: 0.75rem 0 0.5rem; border: 1px solid var(--line-bright); background: var(--raised); }
 .clip-heading { display: flex; justify-content: space-between; padding: 0.65rem 0.8rem; border-bottom: 1px solid var(--line); }
 .clip-heading span { color: var(--accent); }
-.clip video { display: block; width: 100%; max-height: min(52vh, 34rem); background: #000; }
-.clip-unavailable { padding: 0 0.8rem; color: var(--dim); }
-.transcript { padding: 0.7rem 0.8rem 0.8rem; border-top: 1px solid var(--line); user-select: text; }
-.transcript span { color: var(--accent); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.1em; }
-.transcript p { margin: 0.35rem 0 0; line-height: 1.45; }
+.clip video { display: block; width: 100%; aspect-ratio: 16 / 9; max-height: min(52vh, 34rem); background: #000; object-fit: contain; }
+.clip-unavailable { padding: 0 0.8rem; color: var(--dim); aspect-ratio: 16 / 9; display: flex; align-items: center; }
+.transcript { border-top: 1px solid var(--line); user-select: text; }
+.transcript summary { padding: 0.55rem 0.8rem; color: var(--accent); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.1em; cursor: pointer; }
+.transcript[open] summary { border-bottom: 1px solid var(--line); }
+.transcript p { margin: 0; padding: 0.6rem 0.8rem 0.75rem; line-height: 1.45; }
 
 .command-backdrop { position: fixed; inset: 0; z-index: 20; display: flex; align-items: flex-start; justify-content: center; padding-top: 18vh; background: rgb(0 0 0 / 72%); }
-.command-menu { width: min(28rem, calc(100vw - 2rem)); border: 1px solid var(--line-bright); background: var(--surface); box-shadow: 0 1rem 4rem #000; }
+.command-menu { width: min(28rem, calc(100vw - 2rem)); border: 1px solid var(--line-bright); background: var(--deep); box-shadow: 0 1rem 4rem #000; }
 .command-title { margin: 0; padding: 0.75rem 1rem; border-bottom: 1px solid var(--line); color: var(--dim); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em; }
 .command { display: flex; justify-content: space-between; width: 100%; border: 0; padding: 0.85rem 1rem; background: transparent; cursor: pointer; }
 .command.active { background: var(--text); color: var(--deep); }
-.command.active kbd { border-color: #6c786f; color: #354139; }
+.command.active kbd { border-color: rgb(0 0 0 / 0.28); color: var(--ink-dim); }
 
 /* Players, teams, and WAR */
 .collection-pane { display: grid; grid-template-rows: auto auto minmax(0, 1fr); }
@@ -97,9 +98,9 @@ h1 span { color: var(--dim); font-weight: 400; }
 .entity-row > span { display: flex; min-width: 0; flex-direction: column; gap: 0.18rem; }
 .entity-row strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .entity-row small { color: var(--dim); }
-.entity-row.active small { color: #425047; }
+.entity-row.active small { color: var(--ink-dim); }
 .entity-row > b { color: var(--accent); }
-.entity-row.active > b { color: #274c33; }
+.entity-row.active > b { color: #000; }
 .team-row { padding-block: 0.82rem; }
 .entity-detail-pane { display: grid; grid-template-rows: auto minmax(0, 1fr); }
 .entity-detail-pane:has(.team-stat-strip) { grid-template-rows: auto auto minmax(0, 1fr); }
@@ -197,9 +198,9 @@ h1 span { color: var(--dim); font-weight: 400; }
 .search-result.active { background: var(--text); color: var(--deep); }
 .search-result > span { display: flex; justify-content: space-between; gap: 0.75rem; }
 .search-result small { color: var(--dim); white-space: nowrap; }
-.search-result.active small { color: #425047; }
+.search-result.active small { color: var(--ink-dim); }
 .search-result p { display: -webkit-box; overflow: hidden; margin: 0.45rem 0 0; color: var(--dim); font-size: 0.78rem; line-height: 1.4; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
-.search-result.active p { color: #425047; }
+.search-result.active p { color: var(--ink-dim); }
 .inline-notice { margin: 0.8rem; border: 1px solid var(--danger); padding: 0.8rem; color: var(--danger); }
 .inline-notice p { margin: 0.4rem 0 0.7rem; }
 .inline-notice button { border: 1px solid var(--danger); padding: 0.35rem 0.55rem; background: transparent; color: var(--danger); cursor: pointer; }

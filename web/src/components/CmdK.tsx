@@ -6,7 +6,7 @@ const commands = [
   { label: 'Players', hint: 'P', path: '/players' },
   { label: 'Highlights', hint: 'H', path: '/highlights' },
   { label: 'Transcript search', hint: '/', path: '/search' },
-  { label: 'WAR leaderboard', hint: 'W', path: '/war' },
+  // { label: 'WAR leaderboard', hint: 'W', path: '/war' }, // WAR not ready, hidden from menu
   { label: 'Teams', hint: 'T', path: '/teams' },
   { label: "Today's games", hint: 'D', path: `/games?date=${new Date().toISOString().slice(0, 10)}` },
 ];
@@ -46,6 +46,7 @@ export function CmdK() {
         setSelected((value) => (value - 1 + commands.length) % commands.length);
       }
       if (event.key === 'Enter') {
+        event.preventDefault();
         navigate(commands[selected]!.path);
         setOpen(false);
       }

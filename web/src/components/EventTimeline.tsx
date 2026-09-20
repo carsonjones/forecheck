@@ -49,10 +49,10 @@ export function EventTimeline({ events, highlights }: Props) {
                       </video>
                     ) : <p className="clip-unavailable">Video is not available.</p>}
                     {highlight.transcript && (
-                      <div className="transcript">
-                        <span>Transcript</span>
+                      <details className="transcript">
+                        <summary>Transcript</summary>
                         <p>{highlight.transcript}</p>
-                      </div>
+                      </details>
                     )}
                   </section>
                 )}

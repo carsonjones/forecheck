@@ -15,9 +15,9 @@ export function WarRoute() {
   const season = searchParams.get('season') ?? defaultSeason;
   const query = useQuery({ queryKey: ['war-leaderboard', season], queryFn: () => fetchWarLeaderboard(season) });
 
-  return <Layout header={<><strong>FORECHECK</strong><span>WAR leaderboard</span></>} footer={<><button className="brand-button" onClick={() => window.dispatchEvent(new Event('open-cmdk'))}>● forecheck</button><span><kbd>⌘K</kbd> menu · ratings for {seasonLabel(season)}</span></>}>
+  return <Layout title="WAR" footer={<><kbd>⌘k</kbd> menu · ratings for {seasonLabel(season)}</>}>
     <section className="pane leaderboard-pane">
-      <div className="leaderboard-header"><div><span className="eyebrow">Player value</span><h1>WAR leaderboard</h1></div><label><span>Season</span><select value={season} onChange={(event) => navigate(`/war?season=${event.target.value}`)}>{seasons.map((item) => <option key={item} value={item}>{seasonLabel(item)}</option>)}</select></label></div>
+      <div className="leaderboard-header"><div><span className="eyebrow">Player value</span><h1>WAR</h1></div><label><span>Season</span><select value={season} onChange={(event) => navigate(`/war?season=${event.target.value}`)}>{seasons.map((item) => <option key={item} value={item}>{seasonLabel(item)}</option>)}</select></label></div>
       <div className="leaderboard-table" role="table" aria-label="WAR leaderboard">
         <div className="leaderboard-row leaderboard-columns" role="row"><span>#</span><span>Player</span><span>Pos</span><span>GP</span><span>EV OFF</span><span>EV DEF</span><span>PP</span><span>PK</span><span>Total</span></div>
         {query.status === 'pending' && <p className="empty-state">Loading leaderboard…</p>}

@@ -12,13 +12,14 @@ type Props = {
   videoRef?: Ref<HTMLVideoElement>;
   onEnded?: () => void;
   onSelect?: () => void;
+  transcriptDefaultOpen?: boolean;
 };
 
 function hasGameContext(highlight: Props['highlight']): highlight is HighlightFeedItem | PlayerGoal {
   return 'game_date' in highlight;
 }
 
-export function HighlightCard({ highlight, title, showGame = true, active = false, articleRef, videoRef, onEnded, onSelect }: Props) {
+export function HighlightCard({ highlight, title, showGame = true, active = false, articleRef, videoRef, onEnded, onSelect, transcriptDefaultOpen = false }: Props) {
   const scorer = [highlight.first_name, highlight.last_name].filter(Boolean).join(' ');
   return (
     <article ref={articleRef} className={`clip compact-clip${active ? ' active-clip' : ''}`} onClick={onSelect}>
@@ -37,7 +38,10 @@ export function HighlightCard({ highlight, title, showGame = true, active = fals
         <video ref={videoRef} controls playsInline preload="none" poster={highlight.thumb_url ?? undefined} src={highlight.stream_url} onEnded={onEnded}>Your browser does not support HTML video.</video>
       ) : <p className="clip-unavailable">Video is not available.</p>}
       {highlight.transcript && (
-        <div className="transcript"><span>Transcript</span><p>{highlight.transcript}</p></div>
+        <details className="transcript" open={transcriptDefaultOpen}>
+          <summary>Transcript</summary>
+          <p>{highlight.transcript}</p>
+        </details>
       )}
     </article>
   );

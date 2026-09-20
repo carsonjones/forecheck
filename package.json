@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "cf:dev": "bun run web:build && wrangler dev --remote",
+    "cf:dev": "bun run web:build && wrangler dev",
+    "dev": "bun run web:build && concurrently -k -n worker,web -c yellow,cyan \"wrangler dev --port 8787\" \"bun run web:dev\"",
     "deploy": "bun run web:build && wrangler deploy",
     "web:dev": "bun run --cwd web dev",
     "web:build": "bun run --cwd web build",
@@ -22,8 +23,9 @@
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250115.0",
+    "concurrently": "^10.0.5",
     "typescript": "^5.6.3",
-    "wrangler": "^4.0.0"
+    "wrangler": "^4.135.0"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1019.0"

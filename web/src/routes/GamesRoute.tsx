@@ -61,8 +61,8 @@ export function GamesRoute() {
 
   return (
     <Layout
-      header={<><strong>FORECHECK</strong><span>Game explorer</span></>}
-      footer={<><button className="brand-button" onClick={() => window.dispatchEvent(new Event('open-cmdk'))}>● forecheck</button><span><kbd>⌘K</kbd> menu · <kbd>j/k</kbd> select game</span></>}
+      title="Games"
+      footer={<><kbd>⌘k</kbd> menu · <kbd>j/k</kbd> select game</>}
     >
       <section className="split-view">
         <GamesListPane

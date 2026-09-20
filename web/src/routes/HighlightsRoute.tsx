@@ -103,8 +103,8 @@ export function HighlightsRoute() {
 
   return (
     <Layout
-      header={<><strong>FORECHECK</strong><span>Highlight reel</span></>}
-      footer={<><button className="brand-button" onClick={() => window.dispatchEvent(new Event('open-cmdk'))}>● forecheck</button><span><kbd>j/k</kbd> select · <kbd>space</kbd> play/pause · <kbd>⌘K</kbd> menu</span></>}
+      title="Highlights"
+      footer={<><kbd>j/k</kbd> select · <kbd>space</kbd> play/pause · <kbd>⌘k</kbd> menu</>}
     >
       <section className="pane browser-pane">
         <div className="browser-controls">
