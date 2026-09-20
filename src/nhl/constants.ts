@@ -50,4 +50,5 @@ export const NHL_TEAMS: readonly TeamMetadata[] = [
   { id: 54, abbreviation: 'VGK', name: 'Vegas Golden Knights', city: 'Vegas' },
   { id: 55, abbreviation: 'SEA', name: 'Seattle Kraken', city: 'Seattle' },
   { id: 59, abbreviation: 'UTA', name: 'Utah Hockey Club', city: 'Utah' },
+  { id: 68, abbreviation: 'UTA', name: 'Utah Mammoth', city: 'Utah' },
 ];
