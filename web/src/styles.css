@@ -66,6 +66,8 @@ h1 span { color: var(--dim); font-weight: 400; }
 .event-heading { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.65rem; min-height: 1.25rem; }
 .event-heading time { width: 3.6rem; color: var(--dim); }
 .event-heading strong { text-transform: capitalize; }
+.event-participants { margin: 0.3rem 0 0; font-size: 0.85rem; line-height: 1.5; }
+.event-strength { margin: 0.2rem 0 0; color: var(--dim); font-size: 0.75rem; }
 .event-heading span { color: var(--dim); font-size: 0.78rem; }
 .clip { margin: 0.75rem 0 0.5rem; border: 1px solid var(--line-bright); background: var(--raised); }
 .clip-heading { display: flex; justify-content: space-between; padding: 0.65rem 0.8rem; border-bottom: 1px solid var(--line); }

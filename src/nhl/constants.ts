@@ -7,7 +7,7 @@ export enum GameType {
 export type SortOrder = 'asc' | 'desc';
 
 export const BaseURLWeb = 'https://api-web.nhle.com/v1';
-export const BaseURLStats = 'https://api.nhl.com/stats/rest/en';
+export const BaseURLStats = 'https://api.nhle.com/stats/rest/en';
 
 export type TeamMetadata = {
   id: number;

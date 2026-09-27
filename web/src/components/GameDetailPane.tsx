@@ -31,7 +31,7 @@ export function GameDetailPane({ game, selectedGameId, status, error }: Props) {
             <span>{game.events.length} events · {game.highlights.length} clips</span>
           </div>
           <div className="detail-scroll">
-            <EventTimeline events={game.events} highlights={game.highlights} />
+            <EventTimeline events={game.events} highlights={game.highlights} awayTeamId={game.away_team_id} homeTeamId={game.home_team_id} />
           </div>
         </>
       )}

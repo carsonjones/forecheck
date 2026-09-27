@@ -253,8 +253,20 @@ async function handleGame(gameId: number, url: URL, env: Env): Promise<Response>
 
   const gameQueries = await env.DB.batch([
     env.DB.prepare(`
-      SELECT e.*
+      SELECT e.*,
+        trim(shooter.first_name || ' ' || shooter.last_name) AS shooting_player_name,
+        trim(goalie.first_name || ' ' || goalie.last_name) AS goalie_name,
+        trim(blocker.first_name || ' ' || blocker.last_name) AS blocking_player_name,
+        trim(scorer.first_name || ' ' || scorer.last_name) AS scoring_player_name,
+        trim(assist1.first_name || ' ' || assist1.last_name) AS assist1_player_name,
+        trim(assist2.first_name || ' ' || assist2.last_name) AS assist2_player_name
       FROM events e
+      LEFT JOIN players shooter ON shooter.id = e.shooting_player_id
+      LEFT JOIN players goalie ON goalie.id = e.goalie_id
+      LEFT JOIN players blocker ON blocker.id = e.blocking_player_id
+      LEFT JOIN players scorer ON scorer.id = e.scoring_player_id
+      LEFT JOIN players assist1 ON assist1.id = e.assist1_player_id
+      LEFT JOIN players assist2 ON assist2.id = e.assist2_player_id
       WHERE e.game_id = ?
       ORDER BY e.seconds_elapsed, e.event_id
     `).bind(gameId),
